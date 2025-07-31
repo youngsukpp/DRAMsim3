@@ -43,6 +43,7 @@ class Controller {
     void UpdatePrefetchTransfer();
     int channel_id_;
     bool CheckAllQueueEmpty();
+    bool CheckTotalComplete();
 
    private:
     uint64_t clk_;
@@ -55,6 +56,8 @@ class Controller {
     int overhead_standard_clk;
     bool pim_barrier;
 
+    int total_issued;
+    int total_returned;
     uint64_t pf_overhead;
     uint64_t tr_overhead;
     // uint64_t cumul_pf_overhead;

@@ -164,8 +164,8 @@ TraceBasedCPUForHeterogeneousMemory::TraceBasedCPUForHeterogeneousMemory(const s
     else
         is_using_hp = true;
 
-    if((config_file_HBM.find("ProactivePIM") || config_file_HBM.find("SPACE")) != std::string::npos)
-        is_using_hetero = true;
+    // if((config_file_HBM.find("ProactivePIM") || config_file_HBM.find("SPACE")) != std::string::npos)
+    //     is_using_hetero = true;
 
     int total_cycle = 0;
     LoadTrace(trace_file);
@@ -185,8 +185,10 @@ TraceBasedCPUForHeterogeneousMemory::TraceBasedCPUForHeterogeneousMemory(const s
         trace_name.erase(pos_2, erase_2.size());
 
     std::cout << trace_name << std::endl;
-    PrintStats(trace_name);
-    // PrintStats_DIMM();
+    std::string HBM_stat = trace_name + "_HBM";
+    std::string DIMM_stat = trace_name + "_DIMM";
+    PrintStats(HBM_stat);
+    PrintStats_DIMM(DIMM_stat);
 }
 
 int TraceBasedCPUForHeterogeneousMemory::RunPIM() {
@@ -198,14 +200,13 @@ int TraceBasedCPUForHeterogeneousMemory::RunPIM() {
         int pool_idx_mem = 0;
         int poolings_pim = PIMMem_transaction[i].size();
         int poolings_mem = Mem_transaction[i].size();
-//        std::cout << poolings_pim << std::endl;
+
         // if(i%100 == 0)
-            // std::cout << i << " / " << total_batch << std::endl;
+        std::cout << i << " / " << total_batch << " - cycles : " << clk_PIM << std::endl;
         while(pool_idx_pim < poolings_pim) // && pool_idx_mem < poolings_mem)
         {
             ClockTick();
             AddBatchTransactions(i, pool_idx_pim, pool_idx_mem);
-            // std::cout << "hi" << std::endl;
         }
         while(!pim_complete_)
         {
@@ -223,12 +224,14 @@ void TraceBasedCPUForHeterogeneousMemory::AddBatchTransactions(int batch_idx, in
     if(success)
         pool_idx_PIM++;
 
-    // if(is_using_hetero)
-    // {
-    //     bool success = AddTransactionsToMemory(batch_idx, pool_idx_Mem);
-    //     if(success)
-    //         pool_idx_Mem++;
-    // }
+    if(is_using_hetero)
+    {
+        std::cout << "mem" << std::endl;
+        bool success = AddTransactionsToMemory(batch_idx, pool_idx_Mem);
+        if(success)
+            pool_idx_Mem++;
+        std::cout << "mem complete" << std::endl;
+    }
 }
 
 bool TraceBasedCPUForHeterogeneousMemory::AddTransactionsToPIMMem(int batch_idx, int pool_idx)
@@ -240,7 +243,7 @@ bool TraceBasedCPUForHeterogeneousMemory::AddTransactionsToPIMMem(int batch_idx,
     bool transfer = cmd.compare("TR") == 0 ? true : false;
     bool readall = cmd.compare("RDD") == 0 ? true : false;
     bool deliver = cmd.compare("DR") == 0 ? true : false;
-
+    
     int skewed_cycle = 0;
     if(deliver)
         skewed_cycle = vlen * PIMMem_config->burst_cycle;
@@ -280,7 +283,6 @@ bool TraceBasedCPUForHeterogeneousMemory::AddTransactionsToPIMMem(int batch_idx,
         else
         {
             memory_system_PIM.AddTransaction(addr, false, pim_values);
-            // std::cout << "hi" << std::endl;
         }
 
         return true;

@@ -154,29 +154,35 @@ void ChannelState::UpdateTiming(const Command& cmd, uint64_t clk) {
                 clk);
 
             // Same Bankgroup other banks
-            UpdateOtherBanksSameBankgroupTiming(
-                cmd.addr,
-                timing_
-                    .other_banks_same_bankgroup[static_cast<int>(cmd.cmd_type)],
-                clk);
+            if(!config_.PIM_enabled || (config_.PIM_enabled && config_.PIM_level != "bank"))
+            {
+                UpdateOtherBanksSameBankgroupTiming(
+                    cmd.addr,
+                    timing_
+                        .other_banks_same_bankgroup[static_cast<int>(cmd.cmd_type)],
+                    clk);
+            }
 
-            if(!config_.PIM_enabled || (config_.PIM_enabled && config_.PIM_level == "rank"))
+            if(!config_.PIM_enabled || (config_.PIM_enabled && (config_.PIM_level != "bank" && config_.PIM_level != "bankgroup")))
             {
                 // Other bankgroups
+                // std::cout << "bg update" << std::endl;
                 UpdateOtherBankgroupsSameRankTiming(
                     cmd.addr,
                     timing_
                         .other_bankgroups_same_rank[static_cast<int>(cmd.cmd_type)],
                     clk);
 
-                if(!config_.PIM_enabled)
-                {
-                    // Other ranks
-                    UpdateOtherRanksTiming(
-                        cmd.addr, timing_.other_ranks[static_cast<int>(cmd.cmd_type)],
-                        clk);
-                }
             }
+
+            if(!config_.PIM_enabled)
+            {
+                // Other ranks
+                UpdateOtherRanksTiming(
+                    cmd.addr, timing_.other_ranks[static_cast<int>(cmd.cmd_type)],
+                    clk);
+            }
+
             break;
         case CommandType::REFRESH:
         case CommandType::SREF_ENTER:

@@ -89,7 +89,7 @@ class TraceBasedCPUForHeterogeneousMemory : public CPU {
     int MemGetChannel(uint64_t address);
     void LoadTrace(string filename);
     void PrintStats(std::string tracename) { memory_system_PIM.PrintStats(tracename); }
-    // void PrintStats_DIMM() { memory_system_Mem.PrintStats(); }
+    void PrintStats_DIMM(std::string tracename) { memory_system_Mem.PrintStats(tracename); }
 
     void ClockTick();
     int RunPIM();

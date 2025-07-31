@@ -164,9 +164,9 @@ bool JedecDRAMSystem::AddTransaction(uint64_t hex_addr, bool is_write, PimValues
 }
 
 void JedecDRAMSystem::ClockTick() {
+    bool pim_finished = true;
     for (size_t i = 0; i < ctrls_.size(); i++) {
         // look ahead and return earlier
-        bool pim_finished = true;
         while (true) {
             auto pair = ctrls_[i]->ReturnDoneTrans(clk_);
             if (pair.second == 1) {
@@ -177,9 +177,13 @@ void JedecDRAMSystem::ClockTick() {
                 break;
             }
         }
-        pim_finished = pim_finished && ctrls_[i]->CheckAllQueueEmpty();
+        // std::cout << ctrls_[i]->CheckTotalComplete() << std::endl;
+        pim_finished = pim_finished && ctrls_[i]->CheckTotalComplete();
+        // bool empty = ctrls_[i]->CheckAllQueueEmpty();
     }
-    pim_callback_(pim_finished);
+    // std::cout << "finished : " << pim_finished << std::endl;
+    if(ctrls_.size() == 8)
+        pim_callback_(pim_finished);
 
     for (size_t i = 0; i < ctrls_.size(); i++) {
         ctrls_[i]->ClockTick();

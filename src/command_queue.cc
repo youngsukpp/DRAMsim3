@@ -80,6 +80,26 @@ Command CommandQueue::BGPIM_GetCommandToIssue(int rank, int bankgroup) {
     return Command();
 }
 
+Command CommandQueue::BankPIM_GetCommandToIssue(int rank, int bankgroup, int bank) {
+    int q_idx = GetQueueIndex(rank, bankgroup, bank);
+    CMDQueue& queue = queues_[q_idx];
+
+    if (is_in_ref_) {
+        if (ref_q_indices_.find(q_idx) != ref_q_indices_.end()) {
+            return Command();
+        }
+    }
+    auto cmd = GetFirstReadyInQueue(queue);
+    if (cmd.IsValid()) {
+        if (cmd.IsReadWrite()) {
+            EraseRWCommand(cmd);
+        }
+        return cmd;
+    }
+
+    return Command();
+}
+
 Command CommandQueue::GetCommandToIssue() {
     for (int i = 0; i < num_queues_; i++) {
         auto& queue = GetNextQueue();

@@ -33,6 +33,8 @@ Controller::Controller(int channel, const Config &config, const Timing &timing)
                           ? RowBufPolicy::CLOSE_PAGE
                           : RowBufPolicy::OPEN_PAGE),
       last_trans_clk_(0),
+      total_issued (0),
+      total_returned (0),
       write_draining_(0) {
     if (is_unified_queue_) {
         unified_queue_.reserve(config_.trans_queue_size);
@@ -50,7 +52,6 @@ Controller::Controller(int channel, const Config &config, const Timing &timing)
     }
 }
 
-
 #ifdef CMD_TRACE
     std::string trace_file_name = config_.output_prefix + "ch_" +
                                   std::to_string(channel_id_) + "cmd.trace";
@@ -58,11 +59,14 @@ Controller::Controller(int channel, const Config &config, const Timing &timing)
     cmd_trace_.open(trace_file_name, std::ofstream::out);
 #endif  // CMD_TRACE
 
-
-
 std::pair<uint64_t, int> Controller::ReturnDoneTrans(uint64_t clk) {
     auto it = return_queue_.begin();
+
     while (it != return_queue_.end()) {
+        bool empty = return_queue_.empty() && pending_rd_q_.empty() && pim_queue_.empty();
+        // std::cout << "Queue Empty : " << empty  << " " << pending_rd_q_.size() << " " << pim_queue_.size() << " " << return_queue_.size() << std::endl;
+        // std::cout << "Cycle : " << clk << " " << it->complete_cycle << "  " << it->addr  << std::endl;
+
         if (clk >= it->complete_cycle) {
             if (it->is_write) {
                 simple_stats_.Increment("num_writes_done");
@@ -73,6 +77,8 @@ std::pair<uint64_t, int> Controller::ReturnDoneTrans(uint64_t clk) {
             auto pair = std::make_pair(it->addr, it->is_write);
             it = return_queue_.erase(it);
             last_cmd_end_clk = it->complete_cycle;
+            total_returned++;
+            // std::cout << total_returned << std::endl;
             return pair;
         } else {
             ++it;
@@ -81,8 +87,13 @@ std::pair<uint64_t, int> Controller::ReturnDoneTrans(uint64_t clk) {
     return std::make_pair(-1, -1);
 }
 
+bool Controller::CheckTotalComplete() {
+    // std::cout << "issued, returned : " << total_issued << " " << total_returned << std::endl;
+    return total_issued == total_returned;
+}
+
 bool Controller::CheckAllQueueEmpty() {
-    return pf_queue_.empty() && tr_queue_.empty() && pim_queue_.empty() && pending_rd_q_.empty() && return_queue_.empty();
+    return pim_queue_.empty() && pending_rd_q_.empty() && return_queue_.empty() && read_queue_.empty();
 }
 
 void Controller::ClockTick() {
@@ -109,14 +120,32 @@ void Controller::ClockTick() {
                         cmd_issued = true;
                     }                    
                 }
-                else
+                else if(config_.PIM_level == "bankgroup")
                 {
+                    int k = 0;
                     for(int j=0; j<config_.bankgroups;j++)
                     {
                         cmd = cmd_queue_.BGPIM_GetCommandToIssue(i, j);
                         if (cmd.IsValid()) {
                             IssueCommand(cmd);
                             cmd_issued = true;
+                            k++;
+                        }
+                    }
+                    // std::cout << k << std::endl;
+                    
+                }
+                else if (config_.PIM_level == "bank")
+                {
+                    for (int j=0; j<config_.bankgroups;j++)
+                    {
+                        for (int k=0; k<config_.banks_per_group; k++)
+                        {
+                            cmd = cmd_queue_.BankPIM_GetCommandToIssue(i,j,k);
+                            if (cmd.IsValid()) {
+                                IssueCommand(cmd);
+                                cmd_issued = true;
+                            }
                         }
                     }
                 }
@@ -203,8 +232,8 @@ void Controller::ClockTick() {
     if(config_.PIM_enabled)
     {
         SchedulePIMTransaction();
-        if(pim_barrier)
-            UpdatePrefetchTransfer();
+        // if(pim_barrier)
+        //     UpdatePrefetchTransfer();
     }
     else
         ScheduleTransaction();
@@ -216,34 +245,35 @@ void Controller::ClockTick() {
 }
 
 bool Controller::WillAcceptTransaction(uint64_t hex_addr, bool is_write, bool trpf)  {
-    if(config_.PIM_enabled)
-    {
-        bool trpf_processing = !pf_queue_.empty() || !tr_queue_.empty() || !pim_queue_.empty() || !pending_rd_q_.empty();
-        bool rd_processing = !return_queue_.empty() || !pim_queue_.empty() || !pending_rd_q_.empty();
+    // if(config_.PIM_enabled)
+    // {
+    //     bool trpf_processing = !pf_queue_.empty() || !tr_queue_.empty() || !pim_queue_.empty() || !pending_rd_q_.empty();
+    //     bool rd_processing = !return_queue_.empty() || !pim_queue_.empty() || !pending_rd_q_.empty();
 
-        if(!trpf)
-        {
-            if(trpf_processing)
-                return false;            
-            else
-            {
-                if(pim_barrier)
-                    pim_barrier = false;
-                return true;                
-            }
-        }
-        else
-        {
-            if(rd_processing)
-                return false;
-            else
-            {
-                pim_barrier=true; 
-                return true;
-            }
-        }
+    //     if(!trpf)
+    //     {
+    //         if(trpf_processing)
+    //             return false;            
+    //         else
+    //         {
+    //             if(pim_barrier)
+    //                 pim_barrier = false;
+    //             return true;                
+    //         }
+    //     }
+    //     else
+    //     {
+    //         if(rd_processing)
+    //             return false;
+    //         else
+    //         {
+    //             pim_barrier=true; 
+    //             return true;
+    //         }
+    //     }
 
-    }
+    // }
+    
     if (is_unified_queue_) {
         return unified_queue_.size() < unified_queue_.capacity();
     } else if (!is_write) {
@@ -399,6 +429,7 @@ void Controller::SchedulePIMTransaction(){
                                                     cmd.Bank())) {
                         cmd_queue_.AddCommand(cmd);
                         pending_rd_q_.insert(std::make_pair(sub_trans.addr, sub_trans));
+                        total_issued++;
                     }
                 }
             }            
@@ -417,6 +448,7 @@ void Controller::SchedulePIMTransaction(){
                                                     cmd.Bank())) {
                         cmd_queue_.AddCommand(cmd);
                         pending_rd_q_.insert(std::make_pair(sub_trans.addr, sub_trans));
+                        total_issued++;
                     }
                 }
                 pim_queue_.erase(it);
@@ -427,12 +459,15 @@ void Controller::SchedulePIMTransaction(){
         {
             for(int i=0; i<it->pim_values.vlen; i++)
             {
+                // std::cout << i << std::endl;
                 Transaction sub_trans = DecompressPIMInst(*it, clk_, i);
                 auto cmd = TransToCommand(sub_trans);
                 if (cmd_queue_.WillAcceptCommand(cmd.Rank(), cmd.Bankgroup(),
                                                 cmd.Bank())) {
                     cmd_queue_.AddCommand(cmd);
                     pending_rd_q_.insert(std::make_pair(sub_trans.addr, sub_trans));
+                    total_issued++;
+
                 }
             }
             pim_queue_.erase(it);
@@ -469,6 +504,7 @@ void Controller::ScheduleTransaction() {
             }
             cmd_queue_.AddCommand(cmd);
             queue.erase(it);
+            total_issued++;
             break;
             
         }
@@ -501,9 +537,15 @@ void Controller::IssueCommand(const Command &cmd) {
                     return_queue_.push_back(it->second);
                 else
                     pf_queue_.push_back(it->second);
+                pending_rd_q_.erase(it);
+            }
+            else
+            {
+                return_queue_.push_back(it->second);
+                pending_rd_q_.erase(it);
+                num_reads -= 1;                
             }
 
-            pending_rd_q_.erase(it);
             // num_reads -= 1;
         // }
 
@@ -529,7 +571,7 @@ void Controller::IssueCommand(const Command &cmd) {
 
 Command Controller::TransToCommand(const Transaction &trans) {
     auto addr = config_.AddressMapping(trans.addr);
-    if(trans.pim_values.read_dup_cmd || trans.pim_values.prefetch_cmd)
+    if(config_.PIM_enabled && (trans.pim_values.read_dup_cmd || trans.pim_values.prefetch_cmd))
         addr = config_.AddressMapping_2nd(trans.addr);
     CommandType cmd_type;
     if (row_buf_policy_ == RowBufPolicy::OPEN_PAGE) {

@@ -21,6 +21,7 @@ class CommandQueue {
                  const ChannelState& channel_state, SimpleStats& simple_stats);
     Command BGPIM_GetCommandToIssue(int rank, int bankgroup);
     Command RankPIM_GetCommandToIssue(int rank);
+    Command BankPIM_GetCommandToIssue(int rank, int bankgroup, int bank);
     Command GetCommandToIssue();
     Command GetSecondCommandToIssue();
     void EraseSecondRWCommand(Command cmd);
