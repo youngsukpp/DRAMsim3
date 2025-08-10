@@ -166,7 +166,6 @@ void ChannelState::UpdateTiming(const Command& cmd, uint64_t clk) {
             if(!config_.PIM_enabled || (config_.PIM_enabled && (config_.PIM_level != "bank" && config_.PIM_level != "bankgroup")))
             {
                 // Other bankgroups
-                // std::cout << "bg update" << std::endl;
                 UpdateOtherBankgroupsSameRankTiming(
                     cmd.addr,
                     timing_

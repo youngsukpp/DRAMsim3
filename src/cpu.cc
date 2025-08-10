@@ -201,19 +201,19 @@ int TraceBasedCPUForHeterogeneousMemory::RunPIM() {
         int poolings_pim = PIMMem_transaction[i].size();
         int poolings_mem = Mem_transaction[i].size();
 
-        // if(i%100 == 0)
-        std::cout << i << " / " << total_batch << " - cycles : " << clk_PIM << std::endl;
+        if(i%10 == 0)
+            std::cout << i << " / " << total_batch << " - cycles : " << clk_PIM << std::endl;
         while(pool_idx_pim < poolings_pim) // && pool_idx_mem < poolings_mem)
         {
             ClockTick();
             AddBatchTransactions(i, pool_idx_pim, pool_idx_mem);
         }
-        while(!pim_complete_)
-        {
-            ClockTick();
-        }
-
     }
+    while(!pim_complete_)
+    {
+        ClockTick();
+    }
+
 
     return clk_PIM;
 }
@@ -224,14 +224,14 @@ void TraceBasedCPUForHeterogeneousMemory::AddBatchTransactions(int batch_idx, in
     if(success)
         pool_idx_PIM++;
 
-    if(is_using_hetero)
-    {
-        std::cout << "mem" << std::endl;
-        bool success = AddTransactionsToMemory(batch_idx, pool_idx_Mem);
-        if(success)
-            pool_idx_Mem++;
-        std::cout << "mem complete" << std::endl;
-    }
+    // if(is_using_hetero)
+    // {
+    //     std::cout << "mem" << std::endl;
+    //     bool success = AddTransactionsToMemory(batch_idx, pool_idx_Mem);
+    //     if(success)
+    //         pool_idx_Mem++;
+    //     std::cout << "mem complete" << std::endl;
+    // }
 }
 
 bool TraceBasedCPUForHeterogeneousMemory::AddTransactionsToPIMMem(int batch_idx, int pool_idx)
@@ -310,13 +310,13 @@ void TraceBasedCPUForHeterogeneousMemory::ClockTick(){
     // memory_system_Mem.ClockTick();
     // clk_Mem++;
     // // calculated considering clock frequency difference
-    if(clk_PIM % 2 == 0)
-    {
-        memory_system_Mem.ClockTick();
-        memory_system_Mem.ClockTick();
-        memory_system_Mem.ClockTick();
-        clk_Mem = clk_Mem + 3;
-    }    
+    // if(clk_PIM % 2 == 0)
+    // {
+    //     memory_system_Mem.ClockTick();
+    //     memory_system_Mem.ClockTick();
+    //     memory_system_Mem.ClockTick();
+    //     clk_Mem = clk_Mem + 3;
+    // }    
     clk_PIM++;
 }
 
@@ -348,9 +348,10 @@ void TraceBasedCPUForHeterogeneousMemory::LoadTrace(string filename)
 
     if(file.is_open())
     {
+        int m = 0;
         while (std::getline(file, line, '\n'))
         {
-
+            m++;
             if(line.empty())
             {
                 count++;
@@ -404,6 +405,7 @@ void TraceBasedCPUForHeterogeneousMemory::LoadTrace(string filename)
 
             ss.clear();
         }
+        std::cout << m << std::endl;
     }
 }
 

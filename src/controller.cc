@@ -132,7 +132,8 @@ void Controller::ClockTick() {
                             k++;
                         }
                     }
-                    // std::cout << k << std::endl;
+                    // if(k>1)
+                    //     std::cout << k << std::endl;
                     
                 }
                 else if (config_.PIM_level == "bank")
@@ -380,6 +381,7 @@ void Controller::SchedulePIMTransaction(){
             it->complete_cycle = clk_ + it->pim_values.vlen * config_.tCCD_S * total_pims;
             tr_queue_.push_back(*it);
             pim_queue_.erase(it);
+            // total_issued
             break;
         }
         // if(config_.vp_mapping)
@@ -429,7 +431,7 @@ void Controller::SchedulePIMTransaction(){
                                                     cmd.Bank())) {
                         cmd_queue_.AddCommand(cmd);
                         pending_rd_q_.insert(std::make_pair(sub_trans.addr, sub_trans));
-                        total_issued++;
+                        // total_issued++;
                     }
                 }
             }            
@@ -459,7 +461,6 @@ void Controller::SchedulePIMTransaction(){
         {
             for(int i=0; i<it->pim_values.vlen; i++)
             {
-                // std::cout << i << std::endl;
                 Transaction sub_trans = DecompressPIMInst(*it, clk_, i);
                 auto cmd = TransToCommand(sub_trans);
                 if (cmd_queue_.WillAcceptCommand(cmd.Rank(), cmd.Bankgroup(),
